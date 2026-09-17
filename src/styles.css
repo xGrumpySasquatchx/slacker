@@ -36,7 +36,7 @@ body {
   margin: 0;
   background: var(--surface-0);
   color: var(--text-primary);
-  font-size: 13px;
+  font-size: 14px;
   font-family: 'Public Sans', sans-serif;
   font-weight: 300;
   -webkit-font-smoothing: antialiased;
@@ -71,18 +71,18 @@ h2 {
 }
 
 .app-header h1 {
-  font-size: 22px;
+  font-size: 24px;
 }
 
 .app-header p {
   margin: 3px 0 0;
-  font-size: 14px;
+  font-size: 16px;
   color: var(--text-secondary);
 }
 
 .version {
   margin-left: auto;
-  font-size: 11px;
+  font-size: 12px;
   color: var(--text-muted);
   border: 0.5px solid var(--border);
   border-radius: 999px;
@@ -115,8 +115,12 @@ h2 {
   padding: 10px 12px;
 }
 
+.banner {
+  font-size: 16px;
+}
+
 .panel h2 {
-  font-size: 11px;
+  font-size: 12px;
   letter-spacing: 0.04em;
   text-transform: uppercase;
   color: var(--text-muted);
@@ -127,7 +131,7 @@ label {
   display: flex;
   flex-direction: column;
   gap: 3px;
-  font-size: 10px;
+  font-size: 12px;
   letter-spacing: 0.03em;
   text-transform: uppercase;
   color: var(--text-secondary);
@@ -138,7 +142,7 @@ label {
   border: 0.5px solid var(--border-strong);
   border-radius: 6px;
   padding: 6px 8px;
-  font-size: 12px;
+  font-size: 14px;
   background: var(--surface-2);
   color: var(--text-primary);
   text-transform: none;
@@ -146,7 +150,7 @@ label {
 }
 
 .field.num {
-  width: 88px;
+  width: 104px;
 }
 
 .meta {
@@ -159,7 +163,7 @@ label {
   display: flex;
   justify-content: space-between;
   gap: 8px;
-  font-size: 12px;
+  font-size: 14px;
 }
 
 .meta dt {
@@ -177,7 +181,7 @@ label {
 }
 
 .chip {
-  font-size: 10px;
+  font-size: 12px;
   border: 0.5px solid var(--border);
   border-radius: 999px;
   padding: 2px 7px;
@@ -196,14 +200,14 @@ label {
 
 .hint {
   margin: 0;
-  font-size: 12px;
+  font-size: 14px;
   color: var(--text-secondary);
   line-height: 1.45;
 }
 
 .warn {
   margin: 0;
-  font-size: 12px;
+  font-size: 14px;
   color: var(--text-danger);
   background: var(--bg-danger);
   border: 0.5px solid var(--border-danger);
@@ -213,7 +217,7 @@ label {
 
 .prompt {
   margin: 0;
-  font-size: 12px;
+  font-size: 14px;
   line-height: 1.45;
   color: var(--text-secondary);
   background: var(--bg-accent);
@@ -307,7 +311,7 @@ label {
   border: 0.5px solid var(--border);
   border-radius: var(--radius);
   padding: 5px 8px;
-  min-width: 92px;
+  min-width: 110px;
   display: flex;
   flex-direction: column;
   gap: 2px;
@@ -315,12 +319,12 @@ label {
 }
 
 .kpi span {
-  font-size: 10px;
+  font-size: 12px;
   color: var(--text-muted);
 }
 
 .kpi strong {
-  font-size: 12px;
+  font-size: 16px;
   font-weight: 300;
   font-variant-numeric: tabular-nums;
 }
@@ -336,7 +340,7 @@ label {
   gap: 2px;
   border-color: var(--border-warning);
   background: var(--bg-warning);
-  font-size: 12px;
+  font-size: 16px;
 }
 
 .bind strong {
@@ -352,10 +356,10 @@ label {
 
 .bar {
   display: grid;
-  grid-template-columns: minmax(0, 1.4fr) minmax(80px, 2fr) 88px;
+  grid-template-columns: minmax(0, 1.4fr) minmax(80px, 2fr) 108px;
   gap: 8px;
   align-items: center;
-  font-size: 11px;
+  font-size: 14px;
 }
 
 .bar-name {
@@ -430,11 +434,11 @@ label {
 
 .lever strong {
   font-weight: 300;
-  font-size: 12px;
+  font-size: 16px;
 }
 
 .lever-meta {
-  font-size: 11px;
+  font-size: 12px;
   color: var(--text-muted);
 }
 
@@ -445,11 +449,11 @@ label {
 }
 
 .btn {
-  font-size: 11.5px;
+  font-size: 14px;
   border: 0.5px solid var(--border-strong);
   background: var(--surface-2);
   border-radius: var(--radius);
-  padding: 5px 9px;
+  padding: 6px 12px;
   cursor: pointer;
   color: var(--text-primary);
 }
@@ -477,7 +481,7 @@ label {
   display: flex;
   justify-content: space-between;
   gap: 12px;
-  font-size: 11.5px;
+  font-size: 14px;
   padding: 4px 0;
   border-bottom: 0.5px solid var(--border);
 }
