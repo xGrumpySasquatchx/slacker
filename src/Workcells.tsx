@@ -6,21 +6,35 @@ export function WorkcellEditor({
   onUpdate,
   onAssign,
   onDelete,
+  onFitNames,
 }: {
   definition: ProcessDefinition;
   onAdd: () => void;
   onUpdate: (workcellId: string, patch: { label?: string; location?: string; calendarId?: string }) => void;
   onAssign: (resourceId: string, workcellId: string) => void;
   onDelete: (workcellId: string) => void;
+  onFitNames?: () => void;
 }) {
   const last = definition.workcells.length <= 1;
   return (
     <section className="panel">
       <div className="panel-head">
         <h2>Workcells</h2>
-        <button type="button" className="btn" onClick={onAdd}>
-          Add workcell
-        </button>
+        <div className="panel-head-actions">
+          {onFitNames && (
+            <button
+              type="button"
+              className="btn"
+              onClick={onFitNames}
+              title="Widen the left panel to the longest resource name"
+            >
+              Fit names
+            </button>
+          )}
+          <button type="button" className="btn" onClick={onAdd}>
+            Add workcell
+          </button>
+        </div>
       </div>
       <p className="hint">
         Geography for resources. A sequence that crosses cells needs a transfer — moving a resource

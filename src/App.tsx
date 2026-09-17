@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent, type PointerEvent } from 'react';
 import { forecastImpact } from './engine/pipeline';
 import type {
   DeclinedWorkRecord,
@@ -27,6 +27,40 @@ function seedProcess(): ProcessDefinition {
   return instantiateFromTemplate(antibodyDefinition('mAb'), 'Antibody cloning');
 }
 
+const LEFT_MIN = 240;
+const LEFT_DEFAULT = 280;
+const LEFT_MAX = 720;
+
+function clampLeft(width: number): number {
+  return Math.min(LEFT_MAX, Math.max(LEFT_MIN, Math.round(width)));
+}
+
+let measureCanvas: CanvasRenderingContext2D | null = null;
+
+function textWidth(text: string, font: string): number {
+  if (!measureCanvas) {
+    const canvas = document.createElement('canvas');
+    measureCanvas = canvas.getContext('2d');
+  }
+  if (!measureCanvas) return text.length * 8;
+  measureCanvas.font = font;
+  return measureCanvas.measureText(text).width;
+}
+
+function widthToFitNames(aside: HTMLElement | null, names: string[]): number {
+  if (!aside || names.length === 0) return LEFT_DEFAULT;
+  const sample = aside.querySelector('.res-row span') ?? aside;
+  const style = getComputedStyle(sample);
+  const font = `${style.fontWeight} ${style.fontSize} ${style.fontFamily}`;
+  const nameW = Math.max(...names.map((name) => textWidth(name, font)));
+  const row = aside.querySelector('.res-row');
+  const select = aside.querySelector('.res-row .field');
+  const gap = row ? Number.parseFloat(getComputedStyle(row).gap) || 8 : 8;
+  const selectW = select ? Math.max(select.getBoundingClientRect().width, 148) : 148;
+  const chrome = aside.getBoundingClientRect().width - (row?.getBoundingClientRect().width ?? 0);
+  return clampLeft(nameW + gap + selectW + chrome + 2);
+}
+
 export default function App() {
   const [processes, setProcesses] = useState<ProcessDefinition[]>(() => [seedProcess()]);
   const [activeId, setActiveId] = useState(() => processes[0]?.id ?? '');
@@ -42,6 +76,9 @@ export default function App() {
   const [applied, setApplied] = useState<Lever['kind'] | null>(null);
   const [log, setLog] = useState<EventLog>(() => seedLog());
   const [leversReady, setLeversReady] = useState(false);
+  const [leftWidth, setLeftWidth] = useState(LEFT_DEFAULT);
+  const leftRef = useRef<HTMLElement>(null);
+  const drag = useRef<{ pointerId: number; startX: number; startW: number } | null>(null);
 
   const stored = processes.find((p) => p.id === activeId) ?? processes[0];
   const definition = useMemo(() => {
@@ -60,6 +97,46 @@ export default function App() {
     setProcesses((prev) => prev.map((p) => (p.id === stored.id ? mutator(p) : p)));
   }
 
+  function fitLeftToNames() {
+    setLeftWidth(widthToFitNames(leftRef.current, stored.resources.map((r) => r.name)));
+  }
+
+  function onSplitterPointerDown(event: PointerEvent<HTMLButtonElement>) {
+    event.currentTarget.setPointerCapture(event.pointerId);
+    drag.current = { pointerId: event.pointerId, startX: event.clientX, startW: leftWidth };
+    document.body.classList.add('resizing-left');
+  }
+
+  function onSplitterPointerMove(event: PointerEvent<HTMLButtonElement>) {
+    if (!drag.current || event.pointerId !== drag.current.pointerId) return;
+    setLeftWidth(clampLeft(drag.current.startW + event.clientX - drag.current.startX));
+  }
+
+  function onSplitterPointerUp(event: PointerEvent<HTMLButtonElement>) {
+    if (!drag.current || event.pointerId !== drag.current.pointerId) return;
+    drag.current = null;
+    document.body.classList.remove('resizing-left');
+  }
+
+  function onSplitterKeyDown(event: KeyboardEvent<HTMLButtonElement>) {
+    if (event.key === 'ArrowRight') {
+      event.preventDefault();
+      setLeftWidth((width) => clampLeft(width + 16));
+    } else if (event.key === 'ArrowLeft') {
+      event.preventDefault();
+      setLeftWidth((width) => clampLeft(width - 16));
+    } else if (event.key === 'Enter') {
+      event.preventDefault();
+      fitLeftToNames();
+    } else if (event.key === 'Home') {
+      event.preventDefault();
+      setLeftWidth(LEFT_MIN);
+    } else if (event.key === 'End') {
+      event.preventDefault();
+      setLeftWidth(LEFT_MAX);
+    }
+  }
+
   function createProcess() {
     const template = newTemplateId === 'antibody' ? antibodyDefinition(newFormat) : definitionById(newTemplateId);
     const process = instantiateFromTemplate(template, newName);
@@ -68,6 +145,10 @@ export default function App() {
     setCreating(false);
     setAccepted([]);
   }
+
+  useEffect(() => {
+    return () => document.body.classList.remove('resizing-left');
+  }, []);
 
   useEffect(() => {
     const handle = window.setTimeout(() => setDebounced(draft), 150);
@@ -199,8 +280,8 @@ export default function App() {
         <span className="version">MVP · analytical</span>
       </header>
 
-      <div className="layout">
-        <aside className="col">
+      <div className="layout" style={{ '--left-col': `${leftWidth}px` } as CSSProperties}>
+        <aside className="col col-left" ref={leftRef}>
           <section className="panel">
             <div className="panel-head">
               <h2>Process</h2>
@@ -305,6 +386,7 @@ export default function App() {
             onUpdate={(workcellId, patch) => patchActive((def) => updateWorkcell(def, workcellId, patch))}
             onAssign={(resourceId, workcellId) => patchActive((def) => assignResource(def, resourceId, workcellId))}
             onDelete={(workcellId) => patchActive((def) => deleteWorkcell(def, workcellId))}
+            onFitNames={fitLeftToNames}
           />
 
           <section className="panel">
@@ -326,6 +408,21 @@ export default function App() {
             )}
             {forecast?.sampled && <p className="hint">Enumerated sample in use. Figures are labelled sampled.</p>}
           </section>
+          <button
+            type="button"
+            className="splitter"
+            aria-label="Resize process panel"
+            aria-valuemin={LEFT_MIN}
+            aria-valuemax={LEFT_MAX}
+            aria-valuenow={leftWidth}
+            title="Drag to resize. Double-click or press Enter to fit the longest resource name."
+            onPointerDown={onSplitterPointerDown}
+            onPointerMove={onSplitterPointerMove}
+            onPointerUp={onSplitterPointerUp}
+            onPointerCancel={onSplitterPointerUp}
+            onDoubleClick={fitLeftToNames}
+            onKeyDown={onSplitterKeyDown}
+          />
         </aside>
 
         <main className="col main">

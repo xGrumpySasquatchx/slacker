@@ -90,9 +90,10 @@ h2 {
 }
 
 .layout {
+  --left-col: 280px;
   flex: 1;
   display: grid;
-  grid-template-columns: minmax(240px, 280px) minmax(0, 1fr) minmax(220px, 280px);
+  grid-template-columns: var(--left-col) minmax(0, 1fr) minmax(220px, 280px);
   gap: 12px;
   padding: 12px;
   align-items: start;
@@ -103,6 +104,48 @@ h2 {
   flex-direction: column;
   gap: 12px;
   min-width: 0;
+}
+
+.col-left {
+  position: relative;
+}
+
+.splitter {
+  position: absolute;
+  top: 0;
+  right: -12px;
+  width: 12px;
+  height: 100%;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: col-resize;
+  z-index: 2;
+}
+
+.splitter::after {
+  content: '';
+  position: absolute;
+  top: 12px;
+  bottom: 12px;
+  left: 5px;
+  width: 2px;
+  border-radius: 1px;
+  background: var(--border-strong);
+  opacity: 0.75;
+}
+
+.splitter:hover::after,
+.splitter:focus-visible::after,
+body.resizing-left .splitter::after {
+  background: var(--fill-accent);
+  opacity: 1;
+}
+
+body.resizing-left,
+body.resizing-left * {
+  cursor: col-resize !important;
+  user-select: none !important;
 }
 
 .panel,
@@ -137,6 +180,13 @@ h2 {
 
 .panel-head h2 {
   margin-bottom: 0;
+}
+
+.panel-head-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  justify-content: flex-end;
 }
 
 .create-form {
@@ -193,20 +243,23 @@ h2 {
 }
 
 .res-row {
-  display: grid;
-  grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);
+  display: flex;
   gap: 8px;
   align-items: center;
   font-size: 14px;
 }
 
 .res-row span {
+  flex: 1 1 auto;
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .res-row .field {
+  flex: 0 0 10.5rem;
+  width: 10.5rem;
   margin: 0;
 }
 
@@ -572,5 +625,9 @@ label {
 @media (max-width: 1100px) {
   .layout {
     grid-template-columns: 1fr;
+  }
+
+  .splitter {
+    display: none;
   }
 }
