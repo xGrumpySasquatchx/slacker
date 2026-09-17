@@ -12,11 +12,28 @@ import { cloneDefinition } from './engine/validate';
 import { DefinitionError } from './engine/types';
 import { newCandidate, seedOpenCapacity } from './engine/work';
 import { observedQueueDays, seedLog, type EventLog } from './engine/events';
-import { CATALOG, FORMAT_CODES, FORMAT_LABEL, antibodyDefinition, type FormatCode } from './templates';
+import { CATALOG, FORMAT_CODES, FORMAT_LABEL, antibodyDefinition, definitionById, type FormatCode } from './templates';
+import {
+  addWorkcell,
+  assignResource,
+  deleteWorkcell,
+  instantiateFromTemplate,
+  renameProcess,
+  updateWorkcell,
+} from './engine/workcells';
+import { WorkcellEditor } from './Workcells';
+
+function seedProcess(): ProcessDefinition {
+  return instantiateFromTemplate(antibodyDefinition('mAb'), 'Antibody cloning');
+}
 
 export default function App() {
-  const [defId, setDefId] = useState(CATALOG[0].id);
-  const [format, setFormat] = useState<FormatCode>('mAb');
+  const [processes, setProcesses] = useState<ProcessDefinition[]>(() => [seedProcess()]);
+  const [activeId, setActiveId] = useState(() => processes[0]?.id ?? '');
+  const [creating, setCreating] = useState(false);
+  const [newTemplateId, setNewTemplateId] = useState('antibody');
+  const [newFormat, setNewFormat] = useState<FormatCode>('mAb');
+  const [newName, setNewName] = useState('Antibody cloning');
   const [batchKind, setBatchKind] = useState<'immediate' | 'hybrid'>('immediate');
   const [draft, setDraft] = useState<WorkItem>(() => newCandidate());
   const [debounced, setDebounced] = useState(draft);
@@ -26,9 +43,9 @@ export default function App() {
   const [log, setLog] = useState<EventLog>(() => seedLog());
   const [leversReady, setLeversReady] = useState(false);
 
+  const stored = processes.find((p) => p.id === activeId) ?? processes[0];
   const definition = useMemo(() => {
-    const base = defId.startsWith('antibody') ? antibodyDefinition(format) : (CATALOG.find((d) => d.id === defId) ?? CATALOG[0]);
-    const next = cloneDefinition(base);
+    const next = cloneDefinition(stored);
     if (batchKind === 'hybrid') {
       for (const node of next.nodes) {
         if (node.batch.quantum > 1) {
@@ -37,7 +54,20 @@ export default function App() {
       }
     }
     return next;
-  }, [defId, format, batchKind]);
+  }, [stored, batchKind]);
+
+  function patchActive(mutator: (def: ProcessDefinition) => ProcessDefinition) {
+    setProcesses((prev) => prev.map((p) => (p.id === stored.id ? mutator(p) : p)));
+  }
+
+  function createProcess() {
+    const template = newTemplateId === 'antibody' ? antibodyDefinition(newFormat) : definitionById(newTemplateId);
+    const process = instantiateFromTemplate(template, newName);
+    setProcesses((prev) => [...prev, process]);
+    setActiveId(process.id);
+    setCreating(false);
+    setAccepted([]);
+  }
 
   useEffect(() => {
     const handle = window.setTimeout(() => setDebounced(draft), 150);
@@ -51,20 +81,20 @@ export default function App() {
   }, [debounced, definition]);
 
   const booked = useMemo(() => {
-    const n = definition.id.startsWith('antibody') ? 48 : 24;
+    const n = stored.resources.some((r) => r.id === 'res-1') ? 48 : 24;
     return [
       newCandidate({
         id: 'PRJ-2201',
-        label: definition.id.startsWith('antibody') ? 'HER2 panel (booked)' : 'Committed work',
+        label: stored.resources.some((r) => r.id === 'res-1') ? 'HER2 panel (booked)' : 'Committed work',
         definitionId: definition.id,
-        formatCode: definition.id.startsWith('antibody') ? 'mAb' : definition.id,
+        formatCode: stored.resources.some((r) => r.id === 'res-1') ? 'mAb' : definition.id,
         variantCount: n,
         status: 'committed',
         hardness: 'internal',
       }),
       ...accepted,
     ];
-  }, [accepted, definition.id]);
+  }, [accepted, stored.id, stored.resources]);
   const open = seedOpenCapacity();
   const rawForecast = useMemo(() => {
     try {
@@ -151,7 +181,10 @@ export default function App() {
     .filter((s) => s.deltaDays > 0.05 || s.breachesCeiling || s.infeasible)
     .sort((a, b) => b.shareOfTotalDelta - a.shareOfTotalDelta);
   const shown = changed.slice(0, 6);
-  const antibody = definition.id.startsWith('antibody');
+  const templates = [
+    { id: 'antibody', label: 'Antibody cloning (serial)' },
+    ...CATALOG.filter((d) => !d.id.startsWith('antibody')).map((d) => ({ id: d.id, label: d.label })),
+  ];
 
   return (
     <div className="app">
@@ -169,38 +202,79 @@ export default function App() {
       <div className="layout">
         <aside className="col">
           <section className="panel">
-            <h2>Process definition</h2>
+            <div className="panel-head">
+              <h2>Process</h2>
+              <button type="button" className="btn" onClick={() => setCreating((open) => !open)}>
+                {creating ? 'Cancel' : 'New process'}
+              </button>
+            </div>
+            {creating && (
+              <div className="create-form">
+                <label>
+                  Template
+                  <select
+                    className="field"
+                    value={newTemplateId}
+                    onChange={(e) => {
+                      const id = e.target.value;
+                      setNewTemplateId(id);
+                      setNewName(templates.find((t) => t.id === id)?.label ?? 'New process');
+                    }}
+                  >
+                    {templates.map((template) => (
+                      <option key={template.id} value={template.id}>
+                        {template.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                {newTemplateId === 'antibody' && (
+                  <label>
+                    Format
+                    <select className="field" value={newFormat} onChange={(e) => setNewFormat(e.target.value as FormatCode)}>
+                      {FORMAT_CODES.map((code) => (
+                        <option key={code} value={code}>
+                          {FORMAT_LABEL[code]}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                )}
+                <label>
+                  Name
+                  <input className="field" value={newName} onChange={(e) => setNewName(e.target.value)} />
+                </label>
+                <button type="button" className="btn primary" onClick={createProcess}>
+                  Create from template
+                </button>
+              </div>
+            )}
             <label>
-              Template
+              Active process
               <select
                 className="field"
-                value={antibody ? 'antibody' : defId}
+                value={stored.id}
                 onChange={(e) => {
-                  const v = e.target.value;
-                  if (v === 'antibody') setDefId('antibody-mAb');
-                  else setDefId(v);
+                  setActiveId(e.target.value);
+                  setAccepted([]);
+                  setApplied(null);
                 }}
               >
-                <option value="antibody">Antibody cloning (serial)</option>
-                {CATALOG.filter((d) => !d.id.startsWith('antibody')).map((d) => (
-                  <option key={d.id} value={d.id}>
-                    {d.label}
+                {processes.map((process) => (
+                  <option key={process.id} value={process.id}>
+                    {process.label}
                   </option>
                 ))}
               </select>
             </label>
-            {antibody && (
-              <label>
-                Format
-                <select className="field" value={format} onChange={(e) => setFormat(e.target.value as FormatCode)}>
-                  {FORMAT_CODES.map((code) => (
-                    <option key={code} value={code}>
-                      {FORMAT_LABEL[code]}
-                    </option>
-                  ))}
-                </select>
-              </label>
-            )}
+            <label>
+              Process name
+              <input
+                className="field"
+                value={stored.label}
+                onChange={(e) => patchActive((def) => renameProcess(def, e.target.value))}
+              />
+            </label>
             <label>
               Batch close
               <select className="field" value={batchKind} onChange={(e) => setBatchKind(e.target.value as 'immediate' | 'hybrid')}>
@@ -219,11 +293,19 @@ export default function App() {
               </div>
               <div>
                 <dt>Workcells</dt>
-                <dd>{definition.workcells.map((w) => w.label).join(', ')}</dd>
+                <dd>{definition.workcells.length}</dd>
               </div>
             </dl>
             <ProcessStrip definition={definition} binding={forecast?.bindingNodeId ?? ''} />
           </section>
+
+          <WorkcellEditor
+            definition={stored}
+            onAdd={() => patchActive((def) => addWorkcell(def))}
+            onUpdate={(workcellId, patch) => patchActive((def) => updateWorkcell(def, workcellId, patch))}
+            onAssign={(resourceId, workcellId) => patchActive((def) => assignResource(def, resourceId, workcellId))}
+            onDelete={(workcellId) => patchActive((def) => deleteWorkcell(def, workcellId))}
+          />
 
           <section className="panel">
             <h2>Static validation</h2>

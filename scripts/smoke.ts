@@ -17,6 +17,13 @@ import {
   unionEffortDefinition,
   yieldOnlyAntibody,
 } from '../src/templates';
+import {
+  addWorkcell,
+  assignResource,
+  deleteWorkcell,
+  instantiateFromTemplate,
+  updateWorkcell,
+} from '../src/engine/workcells';
 
 let failures = 0;
 
@@ -171,6 +178,51 @@ check('batch_consolidate ranks first when open wells exist and scope cost is 0',
 
 const log = seedLog();
 check('ClaimEvent log has visitId and iteration on every visit', log.visits.every((v) => v.visitId && v.iteration === 0) && log.claims.every((c) => c.visitId && c.acquiredAt));
+
+const template = antibodyDefinition('mAb');
+const proc = instantiateFromTemplate(template, 'My mAb');
+check(
+  'instantiateFromTemplate clones with a new process id',
+  proc.id !== template.id && proc.label === 'My mAb' && proc.nodes.length === template.nodes.length,
+);
+validateDefinition(proc);
+
+const twoCells = addWorkcell(proc, { label: 'Expression suite', location: 'B2' });
+check('addWorkcell appends a named cell', twoCells.workcells.length === 2 && twoCells.workcells[1].label === 'Expression suite');
+
+const renamedCell = updateWorkcell(twoCells, twoCells.workcells[1].id, { label: 'Expr', calendarId: 'nights' });
+check(
+  'updateWorkcell edits label and calendar',
+  renamedCell.workcells[1].label === 'Expr' && renamedCell.workcells[1].calendarId === 'nights',
+);
+
+const moved = assignResource(renamedCell, 'res-10', renamedCell.workcells[1].id);
+const exprCell = moved.workcells[1].id;
+check('assignResource moves the resource', moved.resources.find((r) => r.id === 'res-10')?.workcellId === exprCell);
+check(
+  'cross-workcell sequence edges get TransferSpec',
+  !!moved.edges.find((e) => e.id === 'e-9')?.transfer && !!moved.edges.find((e) => e.id === 'e-10')?.transfer,
+);
+validateDefinition(moved);
+
+const dropped = deleteWorkcell(moved, exprCell);
+check(
+  'deleteWorkcell reassigns resources to the remaining cell',
+  dropped.workcells.length === 1 && dropped.resources.every((r) => r.workcellId === dropped.workcells[0].id),
+);
+check('same-cell sequence no longer carries a transfer', !dropped.edges.find((e) => e.id === 'e-9')?.transfer);
+validateDefinition(dropped);
+
+try {
+  deleteWorkcell(dropped, dropped.workcells[0].id);
+  check('cannot delete the last workcell', false);
+} catch (err) {
+  check('cannot delete the last workcell', err instanceof DefinitionError);
+}
+
+const emptyCell = addWorkcell(dropped);
+validateDefinition(emptyCell);
+check('empty workcells are allowed', emptyCell.workcells.length === 2 && emptyCell.workcells[1].resourceIds.length === 0);
 
 console.log(`\n${failures === 0 ? 'All checks passed.' : `${failures} check(s) failed.`}`);
 process.exit(failures === 0 ? 0 : 1);
